@@ -42,6 +42,7 @@
 
 // flow tracking
 typedef struct ndpi_flow_info {
+  char session_tuple[100];
   u_int32_t lower_ip;
   u_int32_t upper_ip;
   u_int16_t lower_port;
@@ -128,6 +129,9 @@ struct ndpi_workflow * ndpi_workflow_init(const struct ndpi_workflow_prefs * pre
  /* workflow main free function */
 void ndpi_workflow_free(struct ndpi_workflow * workflow);
 
+
+char* get_flow_session_tuple(const u_int8_t version, u_int16_t vlan_id, const struct ndpi_iphdr *iph, const struct ndpi_ipv6hdr *iph6, u_int16_t ip_offset, u_int16_t ipsize, u_int16_t l4_packet_len);
+void tuple_to_key(u_int16_t vlan_id, u_int32_t lower_ip, u_int32_t upper_ip, u_int8_t protocol, u_int16_t lower_port, u_int16_t upper_port, char* key);
 
 /** Free flow_info ndpi support structures but not the flow_info itself
  *

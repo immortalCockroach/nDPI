@@ -40,8 +40,11 @@
 #include <pcap.h>
 #include <signal.h>
 #include <pthread.h>
+#include <sys/types.h>
 #include <sys/socket.h>
+#include <arpa/inet.h>
 #include <assert.h>
+#include <hiredis/hiredis.h>
 #include "../config.h"
 #include "ndpi_api.h"
 
@@ -103,6 +106,34 @@ typedef struct ndpi_id {
 // used memory counters
 u_int32_t current_ndpi_memory = 0, max_ndpi_memory = 0;
 
+int sockfd;
+char server_ip[20];
+int port;
+void transmit_rtp(char* ip_packet, bpf_u_int32 len) {
+    printf("socket send rtp\n");
+    send(sockfd, ip_packet, len, 0);
+}
+
+redisContext *c;
+
+void store_unknown_packet(char* key, u_char *ip_packet) {
+    redisReply *reply;
+    reply = redisCommand(c, "RPUSH %s %s", key, ip_packet);
+    freeReplyObject(reply);
+}
+
+void transmit_rtps(char * key) {
+    int j;
+    redisReply *reply;
+    reply = redisCommand(c, "LRANGE %s 0 -1", key);
+    if (reply->type == REDIS_REPLY_ARRAY) {
+        for (j = 0; j < reply->elements; j++) {
+            transmit_rtp(reply->element[j]->str, strlen(reply->element[j]->str));
+        }
+    }
+    reply = redisCommand(c, "del %s", key);
+    freeReplyObject(reply);
+}
 
 /********************** FUNCTIONS ********************* */
 
@@ -163,8 +194,14 @@ static void parseOptions(int argc, char **argv) {
   u_int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
 #endif
 
-  while ((opt = getopt(argc, argv, "df:g:i:hp:l:s:tv:V:n:j:rp:w:q")) != EOF) {
+  while ((opt = getopt(argc, argv, "a:b:df:g:i:hp:l:s:tv:V:n:j:rp:w:q")) != EOF) {
     switch (opt) {
+    case 'a':
+        strcpy(server_ip, optarg); 
+        break;
+    case 'b':
+        port = atoi(optarg);
+        break;
     case 'd':
       enable_protocol_guess = 0;
       break;
@@ -1249,7 +1286,33 @@ void test_lib() {
 #ifdef HAVE_JSON_C
   json_init();
 #endif
+  
+  
+  const char *redis_host = "127.0.0.1";
+  int redis_port = 6379;
+  struct timeval timeout = {1, 500000};
+  c = redisConnectWithTimeout(redis_host, redis_port, timeout);
+  if (c == NULL || c-> err) {
+     if (c) {
+        printf("redis conn error: %s\n", c->errstr);
+        redisFree(c);
+     } else {
+        printf("conn err:can't allocate redis context\n");
+     }
+     exit(1);
+  }
 
+  sockfd = socket(AF_INET, SOCK_STREAM, 0);
+  struct sockaddr_in address;
+  address.sin_family = AF_INET;
+  address.sin_addr.s_addr = inet_addr(server_ip);
+  address.sin_port = htons(port);
+
+  int result = connect(sockfd,(struct sockaddr*)&address,sizeof(address));
+  if (result == -1) {
+        printf("can't establish connection with remote.Exit\n");
+        exit(1);
+  }
   for(thread_id = 0; thread_id < num_threads; thread_id++) {
     pcap_t * cap = openPcapFileOrDevice(thread_id, (const u_char*)_pcap_file[thread_id]);
     setupDetection(thread_id, cap);
@@ -1277,6 +1340,9 @@ void test_lib() {
     }
     terminateDetection(thread_id);
   }
+  close(sockfd);
+  redisCommand(c, "flushdb");
+  redisFree(c);
 }
 
 void automataUnitTest() {
