@@ -110,6 +110,7 @@ int sockfd;
 char server_ip[20];
 int port;
 int protocol_identifier;
+char redis_address[20];
 int get_transmit_protocol_identifier() {
     return protocol_identifier;
 }
@@ -154,7 +155,7 @@ static void setupDetection(u_int16_t thread_id, pcap_t * pcap_handle);
 static void help(u_int long_help) {
   printf("Welcome to nDPI %s\n\n", ndpi_revision());
 
-  printf("ndpiReader     -a <transimit server ip address> -b <server port> -c <protocol identifier>\n"
+  printf("ndpiReader     -a <transimit server ip address> -b <server port> -c <protocol identifier> -e redis address\n"
      "               -i <file|device>[-f <filter>][-s <duration> [-p <protos>][-l <loops>\n"
      "               [-q][-d][-h][-t][-v <level [-n <threads>] [-w <file>] [-j <file>]\n"
      "               [-n <threads>] [-w <file>] [-j <file>]\n\n"
@@ -163,6 +164,7 @@ static void help(u_int long_help) {
      "  -b <port>                 | Specity a port of the server above\n"
      "  -c <protocol identifier>  | Specity a protocol identifier to transmit, see output of '-h'\n"
 	 "  -i <file.pcap|device>     | Specify a pcap file/playlist to read packets from or a device for live capture (comma-separated list)\n"
+     "  -e <remote redis address> | Specify a remote redis address to store unknown packet, avoiding losing\n"
 	 "  -f <BPF filter>           | Specify a BPF filter for filtering selected traffic\n"
 	 "  -s <duration>             | Maximum capture duration in seconds (live traffic capture only)\n"
 	 "  -p <file>.protos          | Specify a protocol file (eg. protos.txt)\n"
@@ -202,7 +204,7 @@ static void parseOptions(int argc, char **argv) {
   u_int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
 #endif
 
-  while ((opt = getopt(argc, argv, "a:b:c:df:g:i:hp:l:s:tv:V:n:j:rp:w:q")) != EOF) {
+  while ((opt = getopt(argc, argv, "a:b:c:de:f:g:i:hp:l:s:tv:V:n:j:rp:w:q")) != EOF) {
     switch (opt) {
     case 'a':
         strcpy(server_ip, optarg); 
@@ -217,6 +219,9 @@ static void parseOptions(int argc, char **argv) {
       enable_protocol_guess = 0;
       break;
 
+    case 'e':
+      strcpy(redis_address, optarg);
+      break;
     case 'i':
       _pcap_file[0] = optarg;
       break;
@@ -1298,11 +1303,9 @@ void test_lib() {
   json_init();
 #endif
   
-  
-  const char *redis_host = "127.0.0.1";
   int redis_port = 6379;
   struct timeval timeout = {1, 500000};
-  c = redisConnectWithTimeout(redis_host, redis_port, timeout);
+  c = redisConnectWithTimeout(redis_address, redis_port, timeout);
   if (c == NULL || c-> err) {
      if (c) {
         printf("redis conn error: %s\n", c->errstr);
