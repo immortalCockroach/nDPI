@@ -109,8 +109,12 @@ u_int32_t current_ndpi_memory = 0, max_ndpi_memory = 0;
 int sockfd;
 char server_ip[20];
 int port;
-void transmit_rtp(char* ip_packet, bpf_u_int32 len) {
-    printf("socket send rtp\n");
+int protocol_identifier;
+int get_transmit_protocol_identifier() {
+    return protocol_identifier;
+}
+void transmit_packet(char* ip_packet, bpf_u_int32 len) {
+   // printf("socket send rtp\n");
     send(sockfd, ip_packet, len, 0);
 }
 
@@ -122,13 +126,13 @@ void store_unknown_packet(char* key, u_char *ip_packet) {
     freeReplyObject(reply);
 }
 
-void transmit_rtps(char * key) {
+void transmit_old_packets(char * key) {
     int j;
     redisReply *reply;
     reply = redisCommand(c, "LRANGE %s 0 -1", key);
     if (reply->type == REDIS_REPLY_ARRAY) {
         for (j = 0; j < reply->elements; j++) {
-            transmit_rtp(reply->element[j]->str, strlen(reply->element[j]->str));
+            transmit_packet(reply->element[j]->str, strlen(reply->element[j]->str));
         }
     }
     reply = redisCommand(c, "del %s", key);
@@ -150,10 +154,14 @@ static void setupDetection(u_int16_t thread_id, pcap_t * pcap_handle);
 static void help(u_int long_help) {
   printf("Welcome to nDPI %s\n\n", ndpi_revision());
 
-  printf("ndpiReader -i <file|device> [-f <filter>][-s <duration>]\n"
-	 "          [-p <protos>][-l <loops> [-q][-d][-h][-t][-v <level>]\n"
-	 "          [-n <threads>] [-w <file>] [-j <file>]\n\n"
+  printf("ndpiReader     -a <transimit server ip address> -b <server port> -c <protocol identifier>\n"
+     "               -i <file|device>[-f <filter>][-s <duration> [-p <protos>][-l <loops>\n"
+     "               [-q][-d][-h][-t][-v <level [-n <threads>] [-w <file>] [-j <file>]\n"
+     "               [-n <threads>] [-w <file>] [-j <file>]\n\n"
 	 "Usage:\n"
+     "  -a <server ip address>    | Sepcify a server ip address to transfer ip packets belong to a protocol using socket\n"
+     "  -b <port>                 | Specity a port of the server above\n"
+     "  -c <protocol identifier>  | Specity a protocol identifier to transmit, see output of '-h'\n"
 	 "  -i <file.pcap|device>     | Specify a pcap file/playlist to read packets from or a device for live capture (comma-separated list)\n"
 	 "  -f <BPF filter>           | Specify a BPF filter for filtering selected traffic\n"
 	 "  -s <duration>             | Maximum capture duration in seconds (live traffic capture only)\n"
@@ -194,13 +202,16 @@ static void parseOptions(int argc, char **argv) {
   u_int num_cores = sysconf(_SC_NPROCESSORS_ONLN);
 #endif
 
-  while ((opt = getopt(argc, argv, "a:b:df:g:i:hp:l:s:tv:V:n:j:rp:w:q")) != EOF) {
+  while ((opt = getopt(argc, argv, "a:b:c:df:g:i:hp:l:s:tv:V:n:j:rp:w:q")) != EOF) {
     switch (opt) {
     case 'a':
         strcpy(server_ip, optarg); 
         break;
     case 'b':
         port = atoi(optarg);
+        break;
+    case 'c':
+        protocol_identifier = atoi(optarg);
         break;
     case 'd':
       enable_protocol_guess = 0;

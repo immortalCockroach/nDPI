@@ -385,7 +385,7 @@ static struct ndpi_flow_info *get_ndpi_flow_info(struct ndpi_workflow * workflow
       session_tuple = (char*)malloc(100);
       tuple_to_key(vlan_id, lower_ip, upper_ip, iph->protocol,lower_port, upper_port, session_tuple);
       strcpy(newflow->session_tuple, session_tuple);
-      printf("%s\n", session_tuple);
+   //   printf("%s\n", session_tuple);
       free(session_tuple);
       ndpi_tsearch(newflow, &workflow->ndpi_flows_root[idx], ndpi_workflow_node_cmp); /* Add */
       workflow->stats.ndpi_flow_count++;
@@ -637,9 +637,9 @@ static unsigned int packet_processing(struct ndpi_workflow * workflow,
   /* Protocol already detected */
   if(flow->detection_completed) {
      // 如果是rtp的包，在这里转发
-     if ((int)(flow->detected_protocol.protocol) == NDPI_PROTOCOL_SSH) {
-        transmit_rtp(ip_packet, ipsize);   
-        printf("util trans rtp\n");
+     if ((int)(flow->detected_protocol.protocol) == get_transmit_protocol_identifier()) {
+        transmit_packet(ip_packet, ipsize);   
+       // printf("util trans rtp\n");
      } 
      return(0);
   }
@@ -649,13 +649,13 @@ static unsigned int packet_processing(struct ndpi_workflow * workflow,
 							  ipsize, time, src, dst);
   if (flow->detected_protocol.protocol != NDPI_PROTOCOL_UNKNOWN) {
     // 如果是第一个检测出的rtp的包，除了转发之外，还要将对应流的unknown包也转发
-  printf("%u %u\n", flow->detected_protocol.master_protocol, flow->detected_protocol.protocol);
+  //printf("%u %u\n", flow->detected_protocol.master_protocol, flow->detected_protocol.protocol);
     flow->detection_completed = 1;
-     if ((int)(flow->detected_protocol.protocol) == NDPI_PROTOCOL_SSH) {
-        transmit_rtp(ip_packet, ipsize);   
-        transmit_rtps(flow->session_tuple);
+     if ((int)(flow->detected_protocol.protocol) == get_transmit_protocol_identifier()) {
+        transmit_packet(ip_packet, ipsize);   
+        transmit_old_packets(flow->session_tuple);
         
-        printf("util trans rtps\n");
+   //     printf("util trans rtps\n");
      } 
   } else {
     // unknown包的五元组写入redis
