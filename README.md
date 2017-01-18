@@ -57,10 +57,10 @@ To ensure that a tar file includes all necessary files and to run tests on distr
 ### 过滤特定应用层数据包
 
 1. 引入了过滤特定应用层数据包的功能，将对应的ip包转发给指定服务器
-例如 `./ndpiReader -a xx.xx.xx.xx -b port -c 100` 指的是将100对应的应用层协议(SIP, 通过-h查看)的IP包转发到-a -b指定的ip、port的socket上
+例如 `./ndpiReader -a xx.xx.xx.xx -b port -c 100 -e yy.yy.yy.yy` 指的是将100对应的应用层协议(SIP, 通过-h查看)的IP包转发到-a -b指定的ip、port的socket上
 
-2. 加入了缓存unknown protocol数据包的功能，在乱序到达的情况下不丢失检测出应用层协议的数据包
+2. 加入了缓存unknown protocol数据包的功能，在乱序到达的情况下不丢失检测出应用层协议的数据包(上面的-y指定了redis服务器)
 该功能依赖于[redis](https://github.com/antirez/redis)和[hiredis](https://github.com/redis/hiredis)(redis的c client), 即运行ndpiReader的服务器需要安装hiredis
 需要将`.so`文件放到`/usr/local/lib`中, 并将`.h`文件放到`/usr/local/include/hiredis`中(这一步可能由hiredis的Makefile完成)
 在ndpiReader的Makefile中 修改`LDFLAGS = -L/usr/local/lib -lhiredis`
-安装redis的服务器需要修改`redis.conf`,注释掉`bind 127.0.0.1` 并修改`protected-mode no`
+安装redis的服务器需要修改`redis.conf`文件，注释掉`bind 127.0.0.1` 并修改`protected-mode no`
